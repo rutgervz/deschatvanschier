@@ -1,0 +1,74 @@
+@import url('https://fonts.googleapis.com/css2?family=Outfit:wght@300;400;500;600;700;800;900&family=Caveat:wght@400;600;700&family=DM+Serif+Display&display=swap');
+
+:root,
+[data-theme="light"] {
+  --sand: #F5F0E8;
+  --ink: #2C2C2A;
+  --ink-l: #5F5E5A;
+  --ink-m: #888780;
+  --ink-h: #B4B2A9;
+  --wh: #FFFDF8;
+  --sea: #1D7A8A;
+  --sea-l: #E0F2F5;
+  --sea-d: #145A66;
+  --dune: #C4880E;
+  --dune-l: #FAEEDA;
+  --border: rgba(0,0,0,0.06);
+  --border-h: rgba(0,0,0,0.15);
+  --nav-bg: rgba(245,240,232,0.85);
+  --overlay: rgba(40,38,35,0.5);
+  --cat-sport-bg: #E6F1FB; --cat-sport-fg: #0C447C;
+  --cat-avontuur-bg: #FAECE7; --cat-avontuur-fg: #993C1D;
+  --cat-natuur-bg: #E1F5EE; --cat-natuur-fg: #085041;
+  --cat-creatief-bg: #EEEDFE; --cat-creatief-fg: #534AB7;
+  --cat-spel-bg: #FAEEDA; --cat-spel-fg: #854F0B;
+  --cat-sociaal-bg: #FBEAF0; --cat-sociaal-fg: #993556;
+  --tier1-bg: #EAF3DE; --tier1-fg: #27500A;
+  --tier2-bg: #E1F5EE; --tier2-fg: #085041;
+  --tier3-bg: #E6F1FB; --tier3-fg: #0C447C;
+  --tier4-bg: #FAEEDA; --tier4-fg: #633806;
+  --tier5-bg: #FAECE7; --tier5-fg: #712B13;
+  --tier6-bg: #FCEBEB; --tier6-fg: #791F1F;
+  --chat-active: #D97706;
+}
+
+[data-theme="dark"] {
+  --sand: #1A1917;
+  --ink: #E8E5DD;
+  --ink-l: #B4B2A9;
+  --ink-m: #888780;
+  --ink-h: #5F5E5A;
+  --wh: #252420;
+  --sea: #5DCAA5;
+  --sea-l: rgba(29,158,117,0.15);
+  --sea-d: #9FE1CB;
+  --dune: #EF9F27;
+  --dune-l: rgba(239,159,39,0.15);
+  --border: rgba(255,255,255,0.06);
+  --border-h: rgba(255,255,255,0.15);
+  --nav-bg: rgba(26,25,23,0.85);
+  --overlay: rgba(10,10,8,0.6);
+  --cat-sport-bg: rgba(46,123,191,0.2); --cat-sport-fg: #85B7EB;
+  --cat-avontuur-bg: rgba(216,90,48,0.2); --cat-avontuur-fg: #F0997B;
+  --cat-natuur-bg: rgba(29,158,117,0.2); --cat-natuur-fg: #5DCAA5;
+  --cat-creatief-bg: rgba(127,119,221,0.2); --cat-creatief-fg: #AFA9EC;
+  --cat-spel-bg: rgba(196,136,14,0.2); --cat-spel-fg: #FAC775;
+  --cat-sociaal-bg: rgba(212,83,126,0.2); --cat-sociaal-fg: #ED93B1;
+  --tier1-bg: rgba(151,196,89,0.15); --tier1-fg: #C0DD97;
+  --tier2-bg: rgba(93,202,165,0.15); --tier2-fg: #9FE1CB;
+  --tier3-bg: rgba(133,183,235,0.15); --tier3-fg: #B5D4F4;
+  --tier4-bg: rgba(239,159,39,0.15); --tier4-fg: #FAC775;
+  --tier5-bg: rgba(240,153,123,0.15); --tier5-fg: #F5C4B3;
+  --tier6-bg: rgba(240,149,149,0.15); --tier6-fg: #F7C1C1;
+  --chat-active: #FAC775;
+}
+
+* { margin: 0; padding: 0; box-sizing: border-box; }
+
+body {
+  font-family: 'Outfit', sans-serif;
+  background: var(--sand);
+  color: var(--ink);
+  -webkit-font-smoothing: antialiased;
+  transition: background 0.4s ease, color 0.4s ease;
+}
