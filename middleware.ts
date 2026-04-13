@@ -5,8 +5,10 @@ export function middleware(request: NextRequest) {
   const host = request.headers.get('host') || '';
 
   if (host.startsWith('ikbeslistmee.')) {
-    const url = request.nextUrl.clone();
-    if (url.pathname === '/' || url.pathname === '/mogelijkmaakdag') {
+    if (!request.nextUrl.pathname.startsWith('/mogelijkmaakdag/sleutels') &&
+        !request.nextUrl.pathname.startsWith('/api/') &&
+        !request.nextUrl.pathname.startsWith('/_next/')) {
+      const url = request.nextUrl.clone();
       url.pathname = '/mogelijkmaakdag/sleutels';
       return NextResponse.rewrite(url);
     }
@@ -14,7 +16,3 @@ export function middleware(request: NextRequest) {
 
   return NextResponse.next();
 }
-
-export const config = {
-  matcher: ['/', '/mogelijkmaakdag'],
-};
