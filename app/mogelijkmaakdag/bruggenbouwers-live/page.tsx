@@ -26,6 +26,8 @@ export default function LiveResultsPage() {
   const [loading, setLoading] = useState(true);
   const [lastUpdate, setLastUpdate] = useState('');
   const [showVoters, setShowVoters] = useState(false);
+  const [pin, setPin] = useState('');
+  const [unlocked, setUnlocked] = useState(false);
 
   const fetchData = useCallback(async () => {
     try {
@@ -80,6 +82,42 @@ export default function LiveResultsPage() {
   voters.forEach(v => {
     votersByGroup[v.group_name] = (votersByGroup[v.group_name] || 0) + 1;
   });
+
+  if (!unlocked) {
+    return (
+      <div style={{ maxWidth: 360, margin: '0 auto', padding: '4rem 1rem', fontFamily: "'Outfit', sans-serif", textAlign: 'center' }}>
+        <div style={{ fontSize: 48, marginBottom: 16 }}>🔒</div>
+        <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 28, color: 'var(--sea, #2B7A78)', marginBottom: 8 }}>
+          Bruggenbouwers
+        </h1>
+        <p style={{ fontSize: 14, color: 'var(--ink-m, #8B7355)', marginBottom: 24 }}>
+          Voer de pincode in om de live uitslagen te bekijken.
+        </p>
+        <input
+          type="tel"
+          inputMode="numeric"
+          maxLength={4}
+          value={pin}
+          onChange={e => {
+            const val = e.target.value.replace(/\D/g, '').slice(0, 4);
+            setPin(val);
+            if (val === '1504') setUnlocked(true);
+          }}
+          placeholder="····"
+          autoFocus
+          style={{
+            width: 160, padding: '14px 0', border: '2px solid var(--border-h, #E8E0D2)',
+            borderRadius: 14, fontFamily: 'inherit', fontSize: 32, textAlign: 'center',
+            letterSpacing: 12, background: 'var(--wh, #fff)', color: 'var(--ink, #5C4A3A)',
+            outline: 'none', display: 'block', margin: '0 auto',
+          }}
+        />
+        {pin.length === 4 && pin !== '1504' && (
+          <div style={{ marginTop: 12, fontSize: 13, color: '#C0392B' }}>Onjuiste pincode</div>
+        )}
+      </div>
+    );
+  }
 
   if (loading) {
     return <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--ink-m)' }}>Laden...</div>;
