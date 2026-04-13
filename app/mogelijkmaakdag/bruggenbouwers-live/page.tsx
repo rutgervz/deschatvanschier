@@ -68,7 +68,8 @@ export default function LiveResultsPage() {
   let cutoffIdx = -1;
   const BUDGET = 50000;
   plans.forEach((p, i) => {
-    // Parse budget string like "€ 8.500" to number
+    // Only count plans that actually received keys
+    if (p.totalKeys === 0) return;
     const budgetNum = parseInt(p.budget.replace(/[^0-9]/g, '')) || 0;
     cumBudget += budgetNum;
     if (cumBudget > BUDGET && cutoffIdx < 0) cutoffIdx = i;
