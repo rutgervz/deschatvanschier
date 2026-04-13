@@ -172,7 +172,7 @@ export default function SleutelsPage() {
                     overflow: 'hidden', position: 'relative',
                   }}>
                     {filled && plan!.poster_url ? (
-                      <Image src={plan!.poster_url} alt={plan!.name} fill sizes="200px" style={{ objectFit: 'cover' }} />
+                      <Image src={plan!.poster_url} alt={plan!.name} fill sizes="200px" style={{ objectFit: 'contain' }} />
                     ) : (
                       <span style={{ fontSize: 32, color: 'var(--border-h)', fontWeight: 600 }}>?</span>
                     )}
@@ -229,7 +229,7 @@ export default function SleutelsPage() {
                 }}>
                   <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--sand)', overflow: 'hidden', position: 'relative' }}>
                     {p.poster_url ? (
-                      <Image src={p.poster_url} alt={p.name} fill sizes="(max-width:500px) 50vw, 200px" style={{ objectFit: 'cover' }} />
+                      <Image src={p.poster_url} alt={p.name} fill sizes="(max-width:500px) 50vw, 200px" style={{ objectFit: 'contain' }} />
                     ) : (
                       <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>🗝️</div>
                     )}
@@ -271,7 +271,7 @@ export default function SleutelsPage() {
               return (
                 <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
                   <div style={{ width: 48, height: 64, borderRadius: 6, overflow: 'hidden', flexShrink: 0, position: 'relative', background: 'var(--sand)' }}>
-                    {plan.poster_url && <Image src={plan.poster_url} alt={plan.name} fill sizes="48px" style={{ objectFit: 'cover' }} />}
+                    {plan.poster_url && <Image src={plan.poster_url} alt={plan.name} fill sizes="48px" style={{ objectFit: 'contain' }} />}
                   </div>
                   <div style={{ flex: 1 }}>
                     <div style={{ fontSize: 11, color: 'var(--ink-m)' }}>{SLOT_LABELS[i]}</div>
