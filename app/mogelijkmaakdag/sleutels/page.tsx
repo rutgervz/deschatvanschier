@@ -4,33 +4,52 @@ import { useState, useEffect, useCallback } from 'react';
 import Image from 'next/image';
 import type { Plan } from '@/lib/plans';
 
-const TOTAL_KEYS = 10;
+const SLOT_KEYS = [3, 2, 1];
+const SLOT_LABELS = ['Nummer 1', 'Nummer 2', 'Nummer 3'];
+const GROUPS = ['0-4 jaar', 'Groep 1-2', 'Groep 3-4', 'Groep 5-6', 'Groep 7-8', 'Klas 1-2', 'Klas 3-4', 'Klas 5-6 / MBO / HBO'];
 
-const keySvg = (c: string) => `<svg viewBox="0 0 24 28" fill="${c}"><circle cx="12" cy="8" r="6" stroke="${c}" stroke-width="1" fill="none"/><circle cx="12" cy="8" r="3.5" fill="${c}" opacity=".25"/><rect x="10.5" y="14" width="3" height="12" rx="1.5"/><rect x="13.5" y="19" width="4" height="2.5" rx="1"/><rect x="13.5" y="23" width="3" height="2.5" rx="1"/></svg>`;
+function KeyIcon({ color = '#C4880E', size = 22 }: { color?: string; size?: number }) {
+  return (
+    <svg viewBox="0 0 24 28" width={size} height={size * 28 / 24} fill={color}>
+      <circle cx="12" cy="8" r="6" stroke={color} strokeWidth="1" fill="none" />
+      <circle cx="12" cy="8" r="3.5" fill={color} opacity={0.3} />
+      <rect x="10.5" y="14" width="3" height="12" rx="1.5" />
+      <rect x="13.5" y="19" width="4" height="2.5" rx="1" />
+      <rect x="13.5" y="23" width="3" height="2.5" rx="1" />
+    </svg>
+  );
+}
+
+function VisualKeys({ count, color = '#C4880E', size = 22 }: { count: number; color?: string; size?: number }) {
+  return (
+    <span style={{ display: 'inline-flex', gap: 2 }}>
+      {Array.from({ length: count }, (_, i) => (
+        <KeyIcon key={i} color={color} size={size} />
+      ))}
+    </span>
+  );
+}
 
 export default function SleutelsPage() {
   const [plans, setPlans] = useState<Plan[]>([]);
   const [loading, setLoading] = useState(true);
   const [phase, setPhase] = useState<'reg' | 'vote' | 'done'>('reg');
+  const [submitting, setSubmitting] = useState(false);
 
-  // Registration
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
   const [dob, setDob] = useState('');
   const [group, setGroup] = useState('');
 
-  // Voting
-  const [myKeys, setMyKeys] = useState<{ [id: number]: number }>({});
+  // choices[0] = plan_id for 3 keys, [1] for 2 keys, [2] for 1 key
+  const [choices, setChoices] = useState<(number | null)[]>([null, null, null]);
 
   const fetchPlans = useCallback(async () => {
     try {
       const res = await fetch('/api/plans');
       const data = await res.json();
       if (data.plans) {
-        setPlans(data.plans);
-        const init: { [id: number]: number } = {};
-        data.plans.forEach((p: Plan) => { init[p.id] = 0; });
-        setMyKeys(init);
+        setPlans(data.plans.filter((p: Plan) => p.status === 'door_naar_slotdag'));
       }
     } catch { console.error('Failed to load plans'); }
     finally { setLoading(false); }
@@ -38,53 +57,60 @@ export default function SleutelsPage() {
 
   useEffect(() => { fetchPlans(); }, [fetchPlans]);
 
-  const keysUsed = Object.values(myKeys).reduce((a, b) => a + b, 0);
-  const keysLeft = TOTAL_KEYS - keysUsed;
   const formValid = firstName.trim() && lastName.trim() && dob && group;
+  const nextSlot = choices.findIndex(c => c === null);
+  const allChosen = !choices.includes(null);
 
-  const changeKey = (id: number, delta: number) => {
-    const newVal = (myKeys[id] || 0) + delta;
-    if (newVal < 0 || newVal > TOTAL_KEYS) return;
-    if (delta > 0 && keysLeft <= 0) return;
-    setMyKeys(prev => ({ ...prev, [id]: newVal }));
+  const selectPlan = (planId: number) => {
+    if (nextSlot < 0 || choices.includes(planId)) return;
+    const next = [...choices];
+    next[nextSlot] = planId;
+    setChoices(next);
+  };
+
+  const clearSlot = (idx: number) => {
+    const next = [...choices];
+    next[idx] = null;
+    setChoices(next);
   };
 
   const doSubmit = async () => {
-    const chosen = Object.entries(myKeys).filter(([, v]) => v > 0).map(([k, v]) => ({ plan_id: Number(k), keys: v }));
-    if (chosen.length === 0) return;
+    if (!allChosen || submitting) return;
+    setSubmitting(true);
+    const votes = choices.map((planId, i) => ({ plan_id: planId!, keys: SLOT_KEYS[i] }));
     try {
-      await fetch('/api/votes', {
+      const res = await fetch('/api/votes', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ firstName, lastName, dob, group, votes: chosen }),
+        body: JSON.stringify({ firstName, lastName, dob, group, votes }),
       });
-      setPhase('done');
-    } catch { alert('Er ging iets mis. Probeer het opnieuw.'); }
+      if (res.ok) setPhase('done');
+      else alert('Er ging iets mis. Probeer het opnieuw.');
+    } catch { alert('Er ging iets mis. Controleer je internetverbinding.'); }
+    finally { setSubmitting(false); }
   };
 
-  // Plans ordered for "mine" tab: with keys first, then alphabetical
-  const withKeys = plans.filter(p => (myKeys[p.id] || 0) > 0).sort((a, b) => (myKeys[b.id] || 0) - (myKeys[a.id] || 0));
-  const withoutKeys = plans.filter(p => (myKeys[p.id] || 0) === 0).sort((a, b) => a.name.localeCompare(b.name));
-  const orderedMine = [...withKeys, ...withoutKeys];
+  const getPlan = (id: number | null) => id !== null ? plans.find(p => p.id === id) : null;
 
   const inputStyle: React.CSSProperties = {
     width: '100%', padding: '10px 12px', border: '1.5px solid var(--border-h)',
-    borderRadius: 10, fontFamily: "'Outfit', sans-serif", fontSize: 14,
+    borderRadius: 10, fontFamily: 'inherit', fontSize: 14,
     background: 'var(--sand)', color: 'var(--ink)', outline: 'none',
   };
 
-  const groups = ['0-4 jaar', 'Groep 1-2', 'Groep 3-4', 'Groep 5-6', 'Groep 7-8', 'Klas 1-2', 'Klas 3-4', 'Klas 5-6 / MBO / HBO'];
-
-  if (loading) return <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--ink-h)' }}>Laden...</div>;
+  if (loading) return <div style={{ textAlign: 'center', padding: '4rem', color: 'var(--ink-m)' }}>Laden...</div>;
 
   return (
     <div style={{ maxWidth: 660, margin: '0 auto', padding: '0 1rem 2rem', fontFamily: "'Outfit', sans-serif" }}>
-      {/* Hero */}
+
+      {/* HERO */}
       <div style={{ textAlign: 'center', padding: '2rem 0 1.5rem' }}>
         <span style={{ fontSize: 40, display: 'block', marginBottom: 8 }}>🗝️</span>
-        <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 36, color: 'var(--sea)', marginBottom: 6 }}>Deel jouw sleutels uit</h1>
+        <h1 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 36, color: 'var(--sea)', marginBottom: 6 }}>
+          Deel jouw sleutels uit
+        </h1>
         <p style={{ fontSize: 14, color: 'var(--ink-m)', lineHeight: 1.6, maxWidth: 460, margin: '0 auto' }}>
-          Jij hebt {TOTAL_KEYS} sleutels. Verdeel ze over de plannen die jij het belangrijkst vindt!
+          Kies 3 plannen. Je favoriet krijgt 3 sleutels, je nummer twee 2 sleutels, en je nummer drie 1 sleutel.
         </p>
       </div>
 
@@ -108,16 +134,16 @@ export default function SleutelsPage() {
             </div>
             <div style={{ flex: 1, minWidth: 140 }}>
               <label style={{ display: 'block', fontSize: 12, color: 'var(--ink-m)', marginBottom: 4, fontWeight: 500 }}>Groep / Klas</label>
-              <select value={group} onChange={e => setGroup(e.target.value)} style={{ ...inputStyle, appearance: 'auto' }}>
+              <select value={group} onChange={e => setGroup(e.target.value)} style={{ ...inputStyle, appearance: 'auto' as const }}>
                 <option value="">Kies je groep...</option>
-                {groups.map(g => <option key={g} value={g}>{g}</option>)}
+                {GROUPS.map(g => <option key={g} value={g}>{g}</option>)}
               </select>
             </div>
           </div>
           <button onClick={() => setPhase('vote')} disabled={!formValid} style={{
-            width: '100%', padding: 14, background: formValid ? 'var(--sea)' : 'var(--ink-h)', color: '#fff',
-            border: 'none', borderRadius: 12, fontFamily: "'Outfit', sans-serif", fontSize: 16, fontWeight: 600,
-            cursor: formValid ? 'pointer' : 'default', marginTop: 6,
+            width: '100%', padding: 14, background: formValid ? 'var(--sea)' : 'var(--ink-h)',
+            color: '#fff', border: 'none', borderRadius: 12, fontFamily: 'inherit', fontSize: 16,
+            fontWeight: 600, cursor: formValid ? 'pointer' : 'not-allowed', marginTop: 6,
           }}>Laat de plannen zien! 🗝️</button>
         </div>
       )}
@@ -125,96 +151,143 @@ export default function SleutelsPage() {
       {/* VOTING */}
       {phase === 'vote' && (
         <>
-          {/* Keys strip */}
-              <div style={{ position: 'sticky', top: 0, zIndex: 10, background: 'var(--wh)', backdropFilter: 'blur(12px)', WebkitBackdropFilter: 'blur(12px)', borderRadius: 0, padding: '12px 16px', marginBottom: 14, borderBottom: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 12, marginLeft: '-1rem', marginRight: '-1rem', paddingLeft: '1rem', paddingRight: '1rem' }}>
-                <div style={{ fontFamily: "'DM Serif Display', serif", fontSize: 38, color: 'var(--dune)', fontWeight: 600, lineHeight: 1, minWidth: 28, textAlign: 'center' }}>{keysLeft}</div>
-                <div style={{ fontSize: 13, color: 'var(--ink-m)', flex: 1 }}>sleutels over</div>
-                <div style={{ display: 'flex', gap: 3 }}>
-                  {Array.from({ length: TOTAL_KEYS }, (_, i) => (
-                    <div key={i} style={{
-                      width: 22, height: 22, borderRadius: '50%',
-                      background: i < keysLeft ? 'var(--dune-light, #F0D78C)' : 'var(--border)',
-                      opacity: i < keysLeft ? 1 : 0.3, transform: i < keysLeft ? '' : 'scale(0.75)',
-                      transition: 'all 0.3s', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                    }} dangerouslySetInnerHTML={{ __html: keySvg(i < keysLeft ? '#C4880E' : '#bbb') }} />
-                  ))}
-                </div>
-              </div>
+          {/* Three slots with posters */}
+          <div style={{ display: 'flex', gap: 10, marginBottom: 14 }}>
+            {[0, 1, 2].map(i => {
+              const plan = getPlan(choices[i]);
+              const filled = !!plan;
+              const isNext = i === nextSlot;
 
-              {/* Plan cards */}
-              {orderedMine.map(p => {
-                const hk = (myKeys[p.id] || 0) > 0;
-                return (
-                  <div key={p.id} style={{
-                    background: 'var(--wh)', borderRadius: 16, marginBottom: 12, overflow: 'hidden',
-                    border: hk ? '1.5px solid var(--dune)' : '1.5px solid var(--border)',
-                    display: 'flex', minHeight: 150, transition: 'all 0.3s',
+              return (
+                <div key={i} onClick={() => filled && clearSlot(i)} style={{
+                  flex: 1, background: 'var(--wh)', borderRadius: 16, overflow: 'hidden',
+                  border: filled ? '2.5px solid var(--dune)' : isNext ? '2.5px dashed var(--sea)' : '2.5px dashed var(--border-h)',
+                  cursor: filled ? 'pointer' : 'default', position: 'relative',
+                  display: 'flex', flexDirection: 'column', transition: 'border-color 0.3s',
+                  animation: isNext ? 'pulse 1.2s ease infinite' : undefined,
+                }}>
+                  <div style={{
+                    width: '100%', aspectRatio: '3/4', background: 'var(--sand)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    overflow: 'hidden', position: 'relative',
                   }}>
-                    {/* Poster */}
-                    <div style={{ width: 130, minWidth: 130, background: 'var(--sand)', position: 'relative', overflow: 'hidden' }}>
-                      {p.poster_url ? (
-                        <Image src={p.poster_url} alt={p.name} fill sizes="130px" style={{ objectFit: 'cover' }} />
-                      ) : (
-                        <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>🗝️</div>
-                      )}
-                    </div>
-                    {/* Info */}
-                    <div style={{ flex: 1, padding: '12px 14px', display: 'flex', flexDirection: 'column' }}>
-                      <div style={{ fontSize: 15, fontWeight: 600, color: 'var(--ink)', marginBottom: 2 }}>{p.name}</div>
-                      <div style={{ fontSize: 11, color: 'var(--ink-m)', marginBottom: 5 }}>{p.team.join(', ')}</div>
-                      {/* Keys controls */}
-                      <div style={{ marginTop: 'auto', paddingTop: 10, borderTop: '1px solid var(--border)', display: 'flex', alignItems: 'center', gap: 6 }}>
-                        <button onClick={() => changeKey(p.id, -1)} disabled={(myKeys[p.id] || 0) === 0} style={{
-                          width: 42, height: 42, borderRadius: 12, border: '2px solid var(--border)', background: 'var(--wh)',
-                          cursor: (myKeys[p.id] || 0) === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: '#C0392B', opacity: (myKeys[p.id] || 0) === 0 ? 0.2 : 1, fontSize: 20, fontWeight: 700, fontFamily: 'inherit',
-                        }}>−</button>
-                        <div style={{ flex: 1, display: 'flex', gap: 3, justifyContent: 'center', alignItems: 'center', minHeight: 30, flexWrap: 'wrap' }}>
-                          {(myKeys[p.id] || 0) > 0 ? (
-                            Array.from({ length: myKeys[p.id] || 0 }, (_, i) => (
-                              <div key={i} style={{ width: 24, height: 24 }} dangerouslySetInnerHTML={{ __html: keySvg('#C4880E') }} />
-                            ))
-                          ) : (
-                            <span style={{ fontSize: 12, color: 'var(--ink-h)' }}>geen sleutels</span>
-                          )}
-                        </div>
-                        <button onClick={() => changeKey(p.id, 1)} disabled={keysLeft === 0} style={{
-                          width: 42, height: 42, borderRadius: 12, border: '2px solid var(--border)', background: 'var(--wh)',
-                          cursor: keysLeft === 0 ? 'not-allowed' : 'pointer', display: 'flex', alignItems: 'center', justifyContent: 'center',
-                          color: 'var(--sea)', opacity: keysLeft === 0 ? 0.2 : 1, fontSize: 20, fontWeight: 700, fontFamily: 'inherit',
-                        }}>+</button>
-                      </div>
-                    </div>
+                    {filled && plan!.poster_url ? (
+                      <Image src={plan!.poster_url} alt={plan!.name} fill sizes="200px" style={{ objectFit: 'cover' }} />
+                    ) : (
+                      <span style={{ fontSize: 32, color: 'var(--border-h)', fontWeight: 600 }}>?</span>
+                    )}
                   </div>
-                );
-              })}
+                  <div style={{ padding: '8px 6px 10px', display: 'flex', flexDirection: 'column', alignItems: 'center', gap: 4 }}>
+                    <div style={{ fontFamily: "'Caveat', cursive", fontSize: 16, color: 'var(--ink-m)' }}>{SLOT_LABELS[i]}</div>
+                    <VisualKeys count={SLOT_KEYS[i]} size={20} />
+                    {filled ? (
+                      <div style={{ fontSize: 10, fontWeight: 600, color: 'var(--ink)', maxWidth: '100%', overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap', padding: '0 2px' }}>
+                        {plan!.name}
+                      </div>
+                    ) : (
+                      <div style={{ fontSize: 11, color: 'var(--ink-h)', fontStyle: 'italic' }}>{isNext ? '← kies hieronder' : '—'}</div>
+                    )}
+                  </div>
+                  {filled && (
+                    <button onClick={e => { e.stopPropagation(); clearSlot(i); }} style={{
+                      position: 'absolute', top: 4, right: 4, width: 24, height: 24, borderRadius: '50%',
+                      background: 'rgba(192,57,43,0.9)', color: '#fff', border: 'none', cursor: 'pointer',
+                      fontSize: 16, display: 'flex', alignItems: 'center', justifyContent: 'center', lineHeight: 1,
+                    }}>×</button>
+                  )}
+                </div>
+              );
+            })}
+          </div>
 
-              <button onClick={doSubmit} disabled={keysUsed === 0} style={{
-                width: '100%', padding: 20, background: keysUsed > 0 ? 'var(--dune)' : 'var(--ink-h)', color: '#fff',
-                border: 'none', borderRadius: 16, fontFamily: "'DM Serif Display', serif", fontSize: 30,
-                cursor: keysUsed > 0 ? 'pointer' : 'not-allowed', margin: '1rem 0',
-              }}>Dit is &apos;m! 🗝️</button>
+          {/* Prompt */}
+          <div style={{ textAlign: 'center', fontSize: 14, color: 'var(--ink-m)', marginBottom: 14, minHeight: 22, display: 'flex', alignItems: 'center', justifyContent: 'center', gap: 6, flexWrap: 'wrap' }}>
+            {nextSlot >= 0 ? (
+              <>Kies je <strong>{SLOT_LABELS[nextSlot].toLowerCase()}</strong> — dit plan krijgt <VisualKeys count={SLOT_KEYS[nextSlot]} size={16} /></>
+            ) : (
+              'Je hebt al je sleutels verdeeld! Klik op een vak hierboven om te wijzigen.'
+            )}
+          </div>
+
+          {/* Plan grid */}
+          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fill, minmax(170px, 1fr))', gap: 12, marginBottom: '1.5rem' }}>
+            {plans.map(p => {
+              const isChosen = choices.includes(p.id);
+              const slotIdx = choices.indexOf(p.id);
+              const isDisabled = !isChosen && nextSlot < 0;
+
+              return (
+                <div key={p.id} onClick={() => {
+                  if (isChosen) clearSlot(slotIdx);
+                  else if (!isDisabled) selectPlan(p.id);
+                }} style={{
+                  background: 'var(--wh)', borderRadius: 14, overflow: 'hidden',
+                  border: isChosen ? '1.5px solid var(--dune)' : '1.5px solid var(--border)',
+                  boxShadow: isChosen ? '0 0 0 2px var(--dune-light, #F0D78C)' : 'none',
+                  cursor: isDisabled ? 'not-allowed' : 'pointer',
+                  opacity: isDisabled ? 0.35 : 1, transition: 'all 0.25s', position: 'relative',
+                }}>
+                  <div style={{ width: '100%', aspectRatio: '3/4', background: 'var(--sand)', overflow: 'hidden', position: 'relative' }}>
+                    {p.poster_url ? (
+                      <Image src={p.poster_url} alt={p.name} fill sizes="(max-width:500px) 50vw, 200px" style={{ objectFit: 'cover' }} />
+                    ) : (
+                      <div style={{ width: '100%', height: '100%', display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: 48 }}>🗝️</div>
+                    )}
+                    {isChosen && (
+                      <div style={{ position: 'absolute', inset: 0, background: 'rgba(212,168,67,0.2)', display: 'flex', alignItems: 'center', justifyContent: 'center' }}>
+                        <div style={{ background: 'var(--dune)', color: '#fff', fontFamily: "'Caveat', cursive", fontSize: 18, fontWeight: 600, padding: '6px 14px', borderRadius: 10, display: 'flex', alignItems: 'center', gap: 6 }}>
+                          #{slotIdx + 1}
+                          <VisualKeys count={SLOT_KEYS[slotIdx]} color="#fff" size={16} />
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                  <div style={{ padding: '6px 10px 2px', fontSize: 13, fontWeight: 600, color: 'var(--ink)', textAlign: 'center' }}>{p.name}</div>
+                  <div style={{ padding: '0 10px 8px', fontSize: 11, color: 'var(--ink-m)', textAlign: 'center' }}>{p.budget}</div>
+                </div>
+              );
+            })}
+          </div>
+
+          <button onClick={doSubmit} disabled={!allChosen || submitting} style={{
+            width: '100%', padding: 20, background: allChosen ? 'var(--dune)' : 'var(--ink-h)',
+            color: '#fff', border: 'none', borderRadius: 16, fontFamily: "'DM Serif Display', serif",
+            fontSize: 30, cursor: allChosen && !submitting ? 'pointer' : 'not-allowed',
+            margin: '1rem 0', opacity: submitting ? 0.7 : 1,
+          }}>{submitting ? 'Even geduld...' : "Dit is 'm! 🗝️"}</button>
         </>
       )}
 
       {/* DONE */}
       {phase === 'done' && (
-        <div style={{ textAlign: 'center', padding: '3rem 1rem' }}>
+        <div style={{ textAlign: 'center', padding: '2.5rem 1rem' }}>
           <div style={{ width: 72, height: 72, borderRadius: '50%', background: '#D5F5E3', display: 'flex', alignItems: 'center', justifyContent: 'center', margin: '0 auto 20px', fontSize: 34, color: '#27AE60', fontWeight: 700 }}>✓</div>
-          <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 34, color: 'var(--sea)', marginBottom: 10 }}>Jouw sleutels zijn uitgedeeld!</h2>
-          <p style={{ color: 'var(--ink-m)', fontSize: 15, lineHeight: 1.7, maxWidth: 420, margin: '0 auto' }}>
-            Bedankt <strong>{firstName}</strong>! Je hebt jouw sleutels verdeeld.
-          </p>
-          <div style={{ textAlign: 'left', maxWidth: 380, margin: '1.5rem auto' }}>
-            {plans.filter(p => (myKeys[p.id] || 0) > 0).sort((a, b) => (myKeys[b.id] || 0) - (myKeys[a.id] || 0)).map(p => (
-              <div key={p.id} style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', padding: '10px 0', borderBottom: '1px solid var(--border)', fontSize: 14 }}>
-                <span style={{ color: 'var(--ink)' }}>{p.name}</span>
-                <span style={{ color: 'var(--dune)', fontWeight: 600, whiteSpace: 'nowrap' }}>{myKeys[p.id]} sleutel{(myKeys[p.id] || 0) > 1 ? 's' : ''} 🗝️</span>
-              </div>
-            ))}
+          <h2 style={{ fontFamily: "'DM Serif Display', serif", fontSize: 34, color: 'var(--sea)', marginBottom: 10 }}>Jouw stem is uitgebracht!</h2>
+          <p style={{ color: 'var(--ink-m)', fontSize: 15, lineHeight: 1.7, maxWidth: 420, margin: '0 auto' }}>Bedankt <strong>{firstName}</strong>!</p>
+          <div style={{ textAlign: 'left', maxWidth: 420, margin: '1.5rem auto' }}>
+            {choices.map((planId, i) => {
+              const plan = getPlan(planId);
+              if (!plan) return null;
+              return (
+                <div key={i} style={{ display: 'flex', alignItems: 'center', gap: 12, padding: '10px 0', borderBottom: '1px solid var(--border)' }}>
+                  <div style={{ width: 48, height: 64, borderRadius: 6, overflow: 'hidden', flexShrink: 0, position: 'relative', background: 'var(--sand)' }}>
+                    {plan.poster_url && <Image src={plan.poster_url} alt={plan.name} fill sizes="48px" style={{ objectFit: 'cover' }} />}
+                  </div>
+                  <div style={{ flex: 1 }}>
+                    <div style={{ fontSize: 11, color: 'var(--ink-m)' }}>{SLOT_LABELS[i]}</div>
+                    <div style={{ fontSize: 14, fontWeight: 600, color: 'var(--ink)' }}>{plan.name}</div>
+                    <div style={{ fontSize: 11, color: 'var(--ink-m)' }}>{plan.budget}</div>
+                  </div>
+                  <VisualKeys count={SLOT_KEYS[i]} size={18} />
+                </div>
+              );
+            })}
           </div>
+          <p style={{ marginTop: '1.5rem', color: 'var(--ink-m)', fontSize: 15 }}>Straks maken we de uitslag bekend! 🎉</p>
         </div>
       )}
+
+      <style>{`@keyframes pulse { 0%,100%{border-color:var(--sea)} 50%{border-color:var(--sea-l,#3AAFA9)} }`}</style>
     </div>
   );
 }

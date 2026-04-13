@@ -11,6 +11,7 @@ export async function POST(req: NextRequest) {
     }
 
     const totalKeys = votes.reduce((sum: number, v: { keys: number }) => sum + v.keys, 0);
+    // Accept both old 10-key system and new 3-2-1 system (6 keys, exactly 3 votes)
     if (totalKeys > 10 || totalKeys < 1) {
       return NextResponse.json({ error: 'Ongeldig aantal sleutels' }, { status: 400 });
     }
